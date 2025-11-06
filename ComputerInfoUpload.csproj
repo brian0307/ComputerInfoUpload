@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- 打包設定 -->
+    <PublishSingleFile>true</PublishSingleFile>       <!-- 生成單一 EXE -->
+    <SelfContained>true</SelfContained>               <!-- 包含 .NET runtime -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>    <!-- 指定平台 -->
+    <!-- (可選) 用 AOT 編譯讓啟動更快 -->
+    <!-- <PublishAot>true</PublishAot> -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="9.0.10" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.10" />
+  </ItemGroup>
+
+</Project>
