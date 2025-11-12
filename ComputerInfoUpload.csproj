@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
+    <UseWindowsForms>true</UseWindowsForms>
+
     <!-- 打包設定 -->
     <PublishSingleFile>true</PublishSingleFile>       <!-- 生成單一 EXE -->
     <SelfContained>true</SelfContained>               <!-- 包含 .NET runtime -->

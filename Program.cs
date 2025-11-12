@@ -13,30 +13,52 @@ namespace ComputerInfoUpload
         {
             Console.OutputEncoding = Encoding.UTF8;
 
+            // --- Parse flags ---
+            // Usage: computerInfoUpload.exe -D C:\Desktop  (enable debug logging to that folder)
+            //        computerInfoUpload.exe --debug C:\Logs
+            // If -D/--debug present but path missing, will use ".\Logs" next to exe.
+            ConfigureLoggingFromArgs(args);
+
             try
             {
-                // 檢查 WMI
-                var service = new ServiceController("winmgmt");
-                if (service.Status != ServiceControllerStatus.Running)
+                ClientLog.Info("Program start.");
+                try
                 {
-                    Console.WriteLine("WMI 未啟動，嘗試啟動中…");
-
-                    // 若服務是停止狀態才啟動
-                    if (service.Status == ServiceControllerStatus.Stopped ||
-                        service.Status == ServiceControllerStatus.StopPending)
+                    // 檢查 WMI
+                    var service = new ServiceController("winmgmt");
+                    if (service.Status != ServiceControllerStatus.Running)
                     {
-                        service.Start();
-                        service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
-                    }
+                        //Console.WriteLine("WMI 未啟動，嘗試啟動中…");
+                        ClientLog.Warn("WMI not running. Attempting to start...");
 
-                    if (service.Status == ServiceControllerStatus.Running)
-                        Console.WriteLine("WMI 已成功啟動\n");
+                        // 若服務是停止狀態才啟動
+                        if (service.Status == ServiceControllerStatus.Stopped ||
+                            service.Status == ServiceControllerStatus.StopPending)
+                        {
+                            service.Start();
+                            service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                        }
+
+                        if (service.Status == ServiceControllerStatus.Running)
+                        {
+                            //Console.WriteLine("WMI 已成功啟動\n");
+                            ClientLog.Info("WMI started successfully.");
+                        }
+                        else
+                        {
+                            //Console.WriteLine("WMI 啟動失敗或超時\n");
+                            ClientLog.Warn("WMI start failed or timed out.");
+                        }
+                    }
                     else
-                        Console.WriteLine("WMI 啟動失敗或超時\n");
+                    {
+                        //Console.WriteLine("WMI 已在執行中\n");
+                        ClientLog.Info("WMI already running.");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("WMI 已在執行中\n");
+                    ClientLog.Error("WMI check/start failed.", ex);
                 }
 
                 /* 建立自動啟動 .bat
@@ -71,12 +93,56 @@ namespace ComputerInfoUpload
                 Console.WriteLine($"\n 已輸出 JSON 檔案至：{outputPath}\n");
                 */
 
-                // （可選）上傳到 API
-                //await ApiUploader.UploadToApi("https://tap.turvo.com.tw/api/?pn=ItDeviceReceive", info);
+                /* （可選）上傳到 API
+                try
+                {
+                    await ApiUploader.UploadToApi("https://sample.com.tw/api/?pn=ItDeviceReceive", info);
+                }
+                catch (Exception ex)
+                {
+                    ClientLog.Error("API 上傳失敗。", ex);
+                }
+                */
+                ClientLog.Info("Program finish.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine("錯誤：" + ex.Message);
+                ClientLog.Error("Program fatal error.", ex);
+                //Console.WriteLine("錯誤：" + ex.Message);
+            }
+        }
+
+        private static void ConfigureLoggingFromArgs(string[] args)
+        {
+            try
+            {
+                // Find -D or --debug
+                int idx = Array.FindIndex(args, a => string.Equals(a, "-D", StringComparison.OrdinalIgnoreCase)
+                                                  || string.Equals(a, "--debug", StringComparison.OrdinalIgnoreCase));
+                if (idx >= 0)
+                {
+                    string? path = null;
+                    if (idx + 1 < args.Length && !args[idx + 1].StartsWith("-"))
+                    {
+                        path = args[idx + 1];
+                    }
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        // default to .\Logs next to exe
+                        path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
+                    }
+                    ClientLog.Configure(true, path);
+                    //Console.WriteLine($"[Debug] Logging enabled to: {path}");
+                }
+                else
+                {
+                    // Default: logging disabled
+                    ClientLog.Configure(false);
+                }
+            }
+            catch
+            {
+                ClientLog.Configure(false);
             }
         }
     }
