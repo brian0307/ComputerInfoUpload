@@ -4,11 +4,7 @@ using System.Text;
 
 namespace ComputerInfoUpload
 {
-    /// <summary>
-    /// Lightweight file logger with on-demand enable.
-    /// Default: disabled. Enable by calling Configure(true, "C:\\Logs") or via command-line "-D <path>".
-    /// When enabled, writes to <path>\\yyyy-MM-dd.log
-    /// </summary>
+
     public static class ClientLog
     {
         private static readonly object _lock = new object();
@@ -16,11 +12,8 @@ namespace ComputerInfoUpload
         private static string _logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
 
         private static string CurrentLogFile =>
-            Path.Combine(_logDir, DateTime.Now.ToString("yyyy-MM-dd") + ".log");
+            Path.Combine(_logDir, DateTime.Now.ToString("yyyy-MM-dd_HH:mm") + "debug.log");
 
-        /// <summary>
-        /// Configure the logger. If enable=true, ensures directory exists.
-        /// </summary>
         public static void Configure(bool enable, string? directory = null)
         {
             try

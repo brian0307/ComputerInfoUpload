@@ -40,10 +40,20 @@ namespace ComputerInfoUpload
             // 顯示器/螢幕解析度
             info["Displays"] = GetDisplayInfos();
 
-            // 網路資訊
+            /* 網路資訊
             var (ip, mac) = GetNetworkInfo();
             info["IpAddress"] = ip;
             info["MacAddress"] = mac;
+            */
+
+            // 列出各網卡（含 Wi-Fi / 有線）
+            info["NetworkAdapters"] = GetNetworkAdapters();
+
+            // 藍牙裝置
+            info["BluetoothDevices"] = GetBluetoothDevices();
+
+            // 音效卡 / 音訊裝置
+            info["AudioDevices"] = GetAudioDevices();
 
             // 使用者資訊
             info["UserName"] = Environment.UserName;
@@ -88,6 +98,7 @@ namespace ComputerInfoUpload
             return "Null";
         }
 
+        /*
         private static (List<string>, List<string>) GetNetworkInfo()
         {
             var ips = new List<string>();
@@ -117,6 +128,50 @@ namespace ComputerInfoUpload
             }
 
             return (ips, macs);
+        }
+        */
+
+        private static List<object> GetNetworkAdapters()
+        {
+            var list = new List<object>();
+            try
+            {
+                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                    var ipProps = ni.GetIPProperties();
+                    var ipv4 = ipProps.UnicastAddresses
+                        .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                        .Select(a => a.Address.ToString())
+                        .ToList();
+
+                    var mac = ni.GetPhysicalAddress()?.GetAddressBytes();
+                    string macStr = mac != null && mac.Length > 0 ? BitConverter.ToString(mac) : "";
+
+                    // 粗略判斷是否為 Wi-Fi
+                    bool isWifi = (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                                  || ni.Name.IndexOf("wi-fi", StringComparison.OrdinalIgnoreCase) >= 0
+                                  || ni.Description.IndexOf("wi-fi", StringComparison.OrdinalIgnoreCase) >= 0
+                                  || ni.Description.IndexOf("wireless", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    list.Add(new
+                    {
+                        Name = ni.Name,
+                        Description = ni.Description,
+                        Type = isWifi ? "Wi-Fi" : ni.NetworkInterfaceType.ToString(),
+                        Status = ni.OperationalStatus.ToString(),
+                        SpeedMbps = ni.Speed > 0 ? (ni.Speed / 1_000_000) : 0,
+                        MacAddress = macStr,
+                        IPv4 = ipv4
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                ClientLog.Warn("GetNetworkAdapters failed: " + ex.Message);
+            }
+            return list;
         }
 
         private static List<string> GetInstalledSoftware()
@@ -428,6 +483,76 @@ namespace ComputerInfoUpload
                 };
             }
             catch { return string.Empty; }
+        }
+
+        private static List<object> GetBluetoothDevices()
+        {
+            var list = new List<object>();
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name, Manufacturer, PNPDeviceID, Status, PNPClass FROM Win32_PnPEntity");
+                foreach (ManagementObject mo in searcher.Get())
+                {
+                    string name = mo["Name"]?.ToString() ?? "";
+                    string pnpClass = mo["PNPClass"]?.ToString() ?? "";
+
+                    // 以 PNPClass=Bluetooth 或 名稱包含 Bluetooth 判斷
+                    if (string.Equals(pnpClass, "Bluetooth", StringComparison.OrdinalIgnoreCase) ||
+                        name.IndexOf("Bluetooth", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        list.Add(new
+                        {
+                            Name = name,
+                            Manufacturer = mo["Manufacturer"]?.ToString() ?? "",
+                            PNPDeviceID = mo["PNPDeviceID"]?.ToString() ?? "",
+                            Status = mo["Status"]?.ToString() ?? ""
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ClientLog.Warn("GetBluetoothDevices failed: " + ex.Message);
+            }
+            return list;
+        }
+
+        private static List<object> GetAudioDevices()
+        {
+            var list = new List<object>();
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name, Manufacturer, Status FROM Win32_SoundDevice");
+                foreach (ManagementObject mo in searcher.Get())
+                {
+                    /*
+                    string status = mo["Status"]?.ToString() ?? "";
+
+                    // 只包含目前啟用的音訊裝置
+                    if (!string.Equals(status, "OK", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    list.Add(new
+                    {
+                        Name = mo["Name"]?.ToString() ?? "",
+                        Manufacturer = mo["Manufacturer"]?.ToString() ?? "",
+                        Status = status
+                    });
+                    */
+
+                    list.Add(new
+                    {
+                        Name = mo["Name"]?.ToString() ?? "",
+                        Manufacturer = mo["Manufacturer"]?.ToString() ?? "",
+                        Status = mo["Status"]?.ToString() ?? ""
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                ClientLog.Warn("GetAudioDevices failed: " + ex.Message);
+            }
+            return list;
         }
     }
 }
